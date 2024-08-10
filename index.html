@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>지뢰를 찾아라</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #333;
+        }
+        #game-area {
+            display: grid;
+            grid-template-columns: repeat(20, 30px);
+            grid-template-rows: repeat(20, 30px);
+            gap: 1px;
+        }
+        .cell {
+            width: 30px;
+            height: 30px;
+            background-color: #999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 2px;
+        }
+        .cell.open {
+            background-color: #ddd;
+            cursor: default;
+        }
+        .cell.mine {
+            background-color: #ddd;
+            background-image: url('https://cdn-icons-png.flaticon.com/512/565/565313.png');
+            background-size: 20px 20px;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .cell.flag {
+            background-color: yellow;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>지뢰를 찾아라</h1>
+    <div id="game-area"></div>
+
+    <script>
+        const gridSize = 20;
+        const mineCount = 40; // 지뢰 개수 설정
+        let mineField = [];
+        let gameOver = false;
+
+        function initializeGame() {
+            mineField = [];
+            gameOver = false;
+            const gameArea = document.getElementById('game-area');
+            gameArea.innerHTML = '';
+
+            for (let i = 0; i < gridSize; i++) {
+                mineField[i] = [];
+                for (let j = 0; j < gridSize; j++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', handleClick);
+                    cell.addEventListener('contextmenu', handleRightClick);
+                    gameArea.appendChild(cell);
+                    mineField[i][j] = { mine: false, open: false, flagged: false };
+                }
+            }
+
+            placeMines();
+            calculateNumbers();
+        }
+
+        function placeMines() {
+            let placedMines = 0;
+            while (placedMines < mineCount) {
+                const row = Math.floor(Math.random() * gridSize);
+                const col = Math.floor(Math.random() * gridSize);
+                if (!mineField[row][col].mine) {
+                    mineField[row][col].mine = true;
+                    placedMines++;
+                }
+            }
+        }
+
+        function calculateNumbers() {
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    if (!mineField[i][j].mine) {
+                        let mineCount = 0;
+                        for (let x = -1; x <= 1; x++) {
+                            for (let y = -1; y <= 1; y++) {
+                                const newRow = i + x;
+                                const newCol = j + y;
+                                if (newRow >= 0 && newRow < gridSize && newCol >= 0 && newCol < gridSize) {
+                                    if (mineField[newRow][newCol].mine) {
+                                        mineCount++;
+                                    }
+                                }
+                            }
+                        }
+                        mineField[i][j].mineCount = mineCount;
+                    }
+                }
+            }
+        }
+
+        function handleClick(event) {
+            if (gameOver) return;
+
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+            if (mineField[row][col].open || mineField[row][col].flagged) return;
+
+            if (mineField[row][col].mine) {
+                gameOver = true;
+                event.target.classList.add('mine');
+                alert('Game Over! You clicked on a mine.');
+                revealMines();
+            } else {
+                openCell(row, col);
+                if (checkWin()) {
+                    gameOver = true;
+                    alert('Congratulations! You won!');
+                }
+            }
+        }
+
+        function handleRightClick(event) {
+            event.preventDefault();
+            if (gameOver) return;
+
+            const row = parseInt(event.target.dataset.row);
+            const col = parseInt(event.target.dataset.col);
+            const cell = mineField[row][col];
+            if (cell.open) return;
+
+            if (cell.flagged) {
+                cell.flagged = false;
+                event.target.classList.remove('flag');
+            } else {
+                cell.flagged = true;
+                event.target.classList.add('flag');
+            }
+        }
+
+        function openCell(row, col) {
+            const cell = mineField[row][col];
+            if (cell.open || cell.flagged) return;
+
+            const element = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            element.classList.add('open');
+            cell.open = true;
+
+            if (cell.mineCount) {
+                element.textContent = cell.mineCount;
+            } else {
+                for (let x = -1; x <= 1; x++) {
+                    for (let y = -1; y <= 1; y++) {
+                        const newRow = row + x;
+                        const newCol = col + y;
+                        if (newRow >= 0 && newRow < gridSize && newCol >= 0 && newCol < gridSize) {
+                            openCell(newRow, newCol);
+                        }
+                    }
+                }
+            }
+        }
+
+        function revealMines() {
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    if (mineField[i][j].mine) {
+                        const element = document.querySelector(`[data-row="${i}"][data-col="${j}"]`);
+                        element.classList.add('mine');
+                    }
+                }
+            }
+        }
+
+        function checkWin() {
+            for (let i = 0; i < gridSize; i++) {
+                for (let j = 0; j < gridSize; j++) {
+                    if (!mineField[i][j].mine && !mineField[i][j].open) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        initializeGame();
+    </script>
+
+</body>
+</html>
